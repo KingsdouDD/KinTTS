@@ -1,0 +1,39 @@
+# 模型文件（换电脑后运行 download.sh 重新下载）
+models/
+
+# 合成输出音频
+outputs/
+
+# 运行时数据
+runtime/
+
+# 日志
+logs/
+*.log
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Node
+node_modules/
+dist/index.js
+dist/index.d.ts
+dist/index.test.js
+dist/index.test.d.ts
+
+# 本地配置（clone 后从 config_template 复制）
+tts_service/config/config.json
+
+# 环境变量文件
+.env
+
+# 临时文件
+*.wav
+*.tmp

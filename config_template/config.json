@@ -1,0 +1,28 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 18170,
+    "startup_timeout": 30
+  },
+  "model": {
+    "id": "models/Qwen3-TTS-12Hz-1.7B-Base",
+    "lazy_load": true,
+    "idle_timeout": 180,
+    "unload_after_request": false
+  },
+  "tts": {
+    "sample_rate": 24000,
+    "max_segment_chars": 300,
+    "instruct": "用自然、稳定、清晰的语气朗读，不要夸张演绎。",
+    "lang_code": "zh"
+  },
+  "voices": {
+    "default": "default"
+  },
+  "volume": {
+    "gain": 1.5,
+    "limit": 0.95,
+    "attack": 5,
+    "release": 20
+  }
+}

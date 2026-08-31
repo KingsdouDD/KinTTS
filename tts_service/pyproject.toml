@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qwe3-tts"
+version = "0.1.0"
+description = "Qwen3-TTS 1.7B local voice clone service for OpenClaw"
+requires-python = ">=3.10"
+dependencies = [
+    "mlx-audio>=0.5.0",
+    "huggingface-hub>=0.20.0",
+]
+
+[project.scripts]
+qwe3-tts-install = "scripts.install:main"
+qwe3-tts-start = "scripts.start:main"
+qwe3-tts-stop = "scripts.stop:main"
+qwe3-tts-add-voice = "scripts.add_voice:main"
+qwe3-tts-test = "scripts.test:main"

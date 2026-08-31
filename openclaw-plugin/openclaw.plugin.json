@@ -1,0 +1,26 @@
+{
+  "id": "qwe3-tts",
+  "name": "qwe3 TTS",
+  "description": "qwe3 TTS 语音合成服务，支持语音克隆，默认迪丽热巴_v2 音色（可通过 qwe3_tts_set_default_voice 切换）。服务未启动时自动拉起。",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "qwe3_tts",
+      "qwe3_tts_start",
+      "qwe3_tts_health",
+      "qwe3_tts_list_voices",
+      "qwe3_tts_set_default_voice",
+      "qwe3_tts_add_voice",
+      "qwe3_tts_remove_voice",
+      "qwe3_tts_unload"
+    ]
+  }
+}

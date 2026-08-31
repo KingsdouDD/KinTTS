@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kinlang.kintts</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>/opt/kin-tts/tts_service/scripts/start.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/opt/kin-tts</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>KINTTS_SERVICE_DIR</key>
+        <string>/opt/kin-tts/tts_service</string>
+        <key>KINTTS_CONFIG_PATH</key>
+        <string>/opt/kin-tts/tts_service/config/config.json</string>
+        <key>KINTTS_MODEL_DIR</key>
+        <string>/opt/kin-tts/models</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/opt/kin-tts/logs/launchd.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/opt/kin-tts/logs/launchd.err.log</string>
+</dict>
+</plist>
