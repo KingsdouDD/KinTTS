@@ -16,9 +16,9 @@ const CONFIG_PATH = process.env.KINTTS_CONFIG_PATH || `${TTS_SERVICE_DIR}/config
 function getDefaultVoice(): string {
   try {
     const cfg = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-    return cfg.voices?.default ?? "迪丽热巴_v2";
+    return cfg.voices?.default ?? "you_voice";
   } catch {
-    return "迪丽热巴_v2";
+    return "you_voice";
   }
 }
 
