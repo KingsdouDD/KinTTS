@@ -13,10 +13,10 @@ const CONFIG_PATH = process.env.KINTTS_CONFIG_PATH || (TTS_SERVICE_DIR + "/confi
 function getDefaultVoice() {
     try {
         const cfg = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-        return cfg.voices?.default ?? "迪丽热巴_v2";
+        return cfg.voices?.default ?? "default_v1";
     }
     catch {
-        return "迪丽热巴_v2";
+        return "default_v1";
     }
 }
 function setDefaultVoice(voiceId) {
@@ -129,7 +129,7 @@ async function ensureModelLoaded() {
 export default defineToolPlugin({
     id: "qwe3-tts",
     name: "qwe3 TTS",
-    description: "qwe3 TTS 语音合成服务，支持语音克隆，默认迪丽热巴_v2 音色（可通过 qwe3_tts_set_default_voice 切换）。服务未启动时自动拉起。",
+    description: "qwe3 TTS 语音合成服务，支持语音克隆，默认default_v1 音色（可通过 qwe3_tts_set_default_voice 切换）。服务未启动时自动拉起。",
     tools: (tool) => [
         // 语音合成
         tool({
@@ -225,7 +225,7 @@ export default defineToolPlugin({
             label: "qwe3 TTS 设置默认音色",
             description: "修改 config/config.json 中的默认音色。修改后立即生效，不需要重启网关。",
             parameters: Type.Object({
-                voice_id: Type.String({ description: "要设为默认的音色 ID（如迪丽热巴_v2、迪丽热巴 等）" }),
+                voice_id: Type.String({ description: "要设为默认的音色 ID（如 default_v1、my_voice 等）" }),
             }),
             execute: async ({ voice_id }) => {
                 setDefaultVoice(voice_id);
