@@ -126,7 +126,7 @@ def qwe3_tts_query_log(limit: int = 10) -> dict:
           "logs": [
             {
               "id": "abc123",
-              "voice": "迪丽热巴_v2",
+              "voice": "you_voice",
               "segments": 41,
               "audio_duration": 217.2,
               "start_time": "16:48:16",
