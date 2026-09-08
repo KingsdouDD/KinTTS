@@ -2,24 +2,61 @@ import { Type } from "typebox";
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import { spawn, spawnSync } from "child_process";
 import { existsSync, readFileSync, writeFileSync } from "fs";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 
+// ── 路径配置（全部通过环境变量或相对路径，兼容所有部署路径）────────────
+// KINTTS_PYTHON        → Python 解释器路径（默认: python3）
+// KINTTS_TTS_DIR       → TTS 服务根目录（默认: ../qwe3 TTS，相对于 workspace）
+// KINTTS_CONFIG_PATH   → config.json 路径（默认: {TTS_DIR}/config/config.json）
+// KINTTS_SERVICE_DIR   → 服务根目录别名，等同 TTS_DIR
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function resolveTtsDir(): string {
+  if (process.env.KINTTS_TTS_DIR || process.env.KINTTS_SERVICE_DIR) {
+    return process.env.KINTTS_TTS_DIR || process.env.KINTTS_SERVICE_DIR!;
+  }
+  // 插件装在 openclaw-workspace/xxx-plugin/ 下，workspace 是父目录的父目录
+  const workspace = resolve(__dirname, "../../..");
+  return resolve(workspace, "qwe3 TTS");
+}
+
+const TTS_DIR = resolveTtsDir();
+
+function getEnv(key: string, fallback: string): string {
+  return process.env[key] || fallback;
+}
+
+const PYTHON = getEnv("KINTTS_PYTHON", "python3");
+const START_SCRIPT = getEnv("KINTTS_START_SCRIPT", resolve(TTS_DIR, "scripts/start.py"));
+const FORCE_KILL_SCRIPT = getEnv("KINTTS_KILL_SCRIPT", resolve(TTS_DIR, "scripts/force_kill.py"));
+const CONFIG_PATH = getEnv("KINTTS_CONFIG_PATH", resolve(TTS_DIR, "config/config.json"));
+const ADD_VOICE_SCRIPT = getEnv("KINTTS_ADD_VOICE_SCRIPT", resolve(TTS_DIR, "scripts/add_voice.py"));
+const REMOVE_VOICE_SCRIPT = getEnv("KINTTS_REMOVE_VOICE_SCRIPT", resolve(TTS_DIR, "scripts/remove_voice.py"));
+const UNLOAD_SCRIPT = getEnv("KINTTS_UNLOAD_SCRIPT", resolve(TTS_DIR, "scripts/unload_model.py"));
+
+// ── 服务地址 ─────────────────────────────────────────────────
 const TTS_URL = "http://127.0.0.1:18170/tts";
 const HEALTH_URL = "http://127.0.0.1:18170/health";
 const VOICES_URL = "http://127.0.0.1:18170/voices";
-const VENV_PYTHON = process.env.KINTTS_PYTHON || "/usr/local/bin/python3";
-const TTS_SERVICE_DIR = process.env.KINTTS_SERVICE_DIR || "./tts_service";
-const START_SCRIPT = process.env.KINTTS_START_SCRIPT || `${TTS_SERVICE_DIR}/scripts/start.py`;
-const FORCE_KILL_SCRIPT = process.env.KINTTS_KILL_SCRIPT || `${TTS_SERVICE_DIR}/scripts/force_kill.py`;
-const CONFIG_PATH = process.env.KINTTS_CONFIG_PATH || `${TTS_SERVICE_DIR}/config/config.json`;
 
-function getDefaultVoice(): string {
+// ── 默认音色策略 ─────────────────────────────────────────────
+// 不硬编码任何音色名，优先从 config.voices.default 读，
+// 读不到则取音色列表第一项，再读不到才用 "default"
+async function getDefaultVoice(): Promise<string> {
   try {
     const cfg = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-    return cfg.voices?.default ?? "you_voice";
-  } catch {
-    return "you_voice";
-  }
+    if (cfg.voices?.default) return cfg.voices.default;
+  } catch { /* ignore */ }
+  try {
+    const res = await fetch(VOICES_URL, { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const json = await res.json() as { voices?: string[] };
+      if (json.voices?.length) return json.voices[0];
+    }
+  } catch { /* ignore */ }
+  return "default";
 }
 
 function setDefaultVoice(voiceId: string): void {
@@ -33,6 +70,8 @@ function setDefaultVoice(voiceId: string): void {
   }
 }
 
+// ── 音量配置 ─────────────────────────────────────────────────
+
 function getVolumeSettings() {
   try {
     const cfg = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
@@ -42,10 +81,9 @@ function getVolumeSettings() {
       limit: vol.limit ?? 0.95,
       attack: vol.attack ?? 5,
       release: vol.release ?? 20,
-      example_af: `volume=${vol.gain ?? 1.5},alimiter=limit=${vol.limit ?? 0.95}:attack=${vol.attack ?? 5}:release=${vol.release ?? 20}`,
     };
   } catch {
-    return { gain: 1.5, limit: 0.95, attack: 5, release: 20, example_af: "volume=1.5,alimiter=limit=0.95:attack=5:release=20" };
+    return { gain: 1.5, limit: 0.95, attack: 5, release: 20 };
   }
 }
 
@@ -63,7 +101,7 @@ function setVolumeSettings(gain: number, limit: number, attack: number, release:
 
 function runPython(scriptPath: string, args: string[] = []): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(VENV_PYTHON, [scriptPath, ...args], {
+    const child = spawn(PYTHON, [scriptPath, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -88,7 +126,6 @@ async function isServiceRunning(): Promise<boolean> {
 }
 
 async function isServiceHealthy(): Promise<boolean> {
-  // 不仅端口通，还要服务真实响应了 /health 才算健康
   try {
     const res = await fetch(HEALTH_URL, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return false;
@@ -101,7 +138,6 @@ async function isServiceHealthy(): Promise<boolean> {
 
 async function ensureService(): Promise<void> {
   if (await isServiceHealthy()) return;
-  // 启动前先强制杀掉残留进程，确保端口干净
   await runPython(FORCE_KILL_SCRIPT);
   await runPython(START_SCRIPT);
   for (let i = 0; i < 30; i++) {
@@ -115,9 +151,8 @@ async function ensureModelLoaded(): Promise<void> {
   await ensureService();
   const res = await fetch(HEALTH_URL, { signal: AbortSignal.timeout(2000) });
   if (!res.ok) throw new Error(`健康检查失败：${res.status}`);
-  const health = await res.json();
+  const health = await res.json() as { model_loaded?: boolean };
   if (health.model_loaded) return;
-  // 模型未加载，手动触发加载
   const loadRes = await fetch("http://127.0.0.1:18170/load", {
     signal: AbortSignal.timeout(120000),
   });
@@ -129,7 +164,7 @@ async function ensureModelLoaded(): Promise<void> {
 export default defineToolPlugin({
   id: "qwe3-tts",
   name: "qwe3 TTS",
-  description: "qwe3 TTS 语音合成服务，支持语音克隆，默认迪丽热巴_v2 音色（可通过 qwe3_tts_set_default_voice 切换）。服务未启动时自动拉起。",
+  description: "qwe3 TTS 语音合成服务，支持语音克隆。服务未启动时自动拉起。",
   tools: (tool) => [
     // 语音合成
     tool({
@@ -147,7 +182,7 @@ export default defineToolPlugin({
       }),
       execute: async ({ text, voice, language }) => {
         await ensureModelLoaded();
-        const v = voice ?? getDefaultVoice();
+        const v = voice ?? (await getDefaultVoice());
         const l = language ?? "Chinese";
         const res = await fetch(TTS_URL, {
           method: "POST",
@@ -155,22 +190,16 @@ export default defineToolPlugin({
           body: JSON.stringify({ text, voice: v, language: l }),
         });
         if (!res.ok) throw new Error(`TTS 请求失败：${res.status}`);
-        const json = await res.json();
+        const json = await res.json() as { success?: boolean; output?: string; duration?: number; error?: string };
         if (!json.success) throw new Error(`TTS 合成失败：${json.error}`);
 
-        // ── 后处理：音量提升 + 防破音（从 config 读取）───────────────
         const vol = getVolumeSettings();
         const gainDb = (Math.log10(vol.gain) * 20).toFixed(1) + "dB";
-        const path = json.output;
+        const path = json.output!;
         const boosted = path.replace(".wav", "_boosted.wav");
         const af = `volume=${gainDb},alimiter=limit=${vol.limit}:attack=${vol.attack}:release=${vol.release}`;
-        spawnSync(
-          "ffmpeg",
-          ["-i", path, "-af", af, "-y", boosted],
-          { stdio: "ignore" }
-        );
+        spawnSync("ffmpeg", ["-i", path, "-af", af, "-y", boosted], { stdio: "ignore" });
         spawnSync("mv", ["-f", boosted, path]);
-        // ────────────────────────────────────────────────────────────────
 
         return { audioPath: json.output, duration: json.duration, voice: v };
       },
@@ -204,7 +233,7 @@ export default defineToolPlugin({
         if (!running) return { running: false };
         try {
           const res = await fetch(HEALTH_URL, { signal: AbortSignal.timeout(2000) });
-          return res.json();
+          return await res.json();
         } catch {
           return { running: false };
         }
@@ -221,7 +250,7 @@ export default defineToolPlugin({
         await ensureService();
         const res = await fetch(VOICES_URL, { signal: AbortSignal.timeout(5000) });
         if (!res.ok) throw new Error(`获取音色列表失败：${res.status}`);
-        const json = await res.json();
+        const json = await res.json() as { voices: string[] };
         return { voices: json.voices };
       },
     }),
@@ -232,7 +261,7 @@ export default defineToolPlugin({
       label: "qwe3 TTS 设置默认音色",
       description: "修改 config/config.json 中的默认音色。修改后立即生效，不需要重启网关。",
       parameters: Type.Object({
-        voice_id: Type.String({ description: "要设为默认的音色 ID（如迪丽热巴_v2、迪丽热巴 等）" }),
+        voice_id: Type.String({ description: "要设为默认的音色 ID" }),
       }),
       execute: async ({ voice_id }) => {
         setDefaultVoice(voice_id);
@@ -293,16 +322,12 @@ export default defineToolPlugin({
         ),
       }),
       execute: async ({ voice_id, reference_audio, reference_text, language }) => {
-        const debug = require("fs").writeFileSync("/tmp/add_voice_debug.txt",
-          JSON.stringify({voice_id, reference_audio, reference_text, language}, null, 2));
         if (!existsSync(reference_audio)) throw new Error(`文件不存在：${reference_audio}`);
         await ensureService();
         const args = [voice_id, reference_audio];
         if (reference_text) args.push("--text", reference_text);
         if (language) args.push(language);
-        require("fs").writeFileSync("/tmp/add_voice_args.txt", JSON.stringify(args));
-        const addVoiceScript = process.env.KINTTS_ADD_VOICE_SCRIPT || `${TTS_SERVICE_DIR}/scripts/add_voice.py`;
-        const out = await runPython(addVoiceScript, args);
+        const out = await runPython(ADD_VOICE_SCRIPT, args);
         return { result: out };
       },
     }),
@@ -316,8 +341,7 @@ export default defineToolPlugin({
         voice_id: Type.String({ description: "要删除的音色 ID" }),
       }),
       execute: async ({ voice_id }) => {
-        const removeVoiceScript = process.env.KINTTS_REMOVE_VOICE_SCRIPT || `${TTS_SERVICE_DIR}/scripts/remove_voice.py`;
-        const out = await runPython(removeVoiceScript, [voice_id]);
+        const out = await runPython(REMOVE_VOICE_SCRIPT, [voice_id]);
         return { result: out };
       },
     }),
@@ -330,28 +354,7 @@ export default defineToolPlugin({
       parameters: Type.Object({}),
       execute: async () => {
         await ensureService();
-        const code = `
-import sys
-sys.path.insert(0, process.env.KINTTS_SERVICE_DIR || '/opt/kin-tts/tts_service')
-from service.model_manager import ModelManager
-mm = ModelManager()
-mm.unload_after_synthesis()
-print('ok')
-`;
-        const out = await new Promise<string>((resolve, reject) => {
-          const child = spawn(process.execPath, ["-c", code], {
-            stdio: ["ignore", "pipe", "pipe"],
-          });
-          let stdout = "";
-          let stderr = "";
-          child.stdout?.on("data", (d) => (stdout += d));
-          child.stderr?.on("data", (d) => (stderr += d));
-          child.on("close", (code) => {
-            if (code === 0) resolve(stdout.trim());
-            else reject(new Error(stderr || `exit ${code}`));
-          });
-          child.on("error", reject);
-        });
+        const out = await runPython(UNLOAD_SCRIPT);
         return { result: out };
       },
     }),

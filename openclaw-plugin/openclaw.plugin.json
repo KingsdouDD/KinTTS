@@ -1,7 +1,7 @@
 {
   "id": "qwe3-tts",
   "name": "qwe3 TTS",
-  "description": "qwe3 TTS 语音合成服务，支持语音克隆，默认you_voice 音色（可通过 qwe3_tts_set_default_voice 切换）。服务未启动时自动拉起。",
+  "description": "qwe3 TTS 语音合成服务，支持语音克隆，默认音色从 config.json 读取（可通过 qwe3_tts_set_default_voice 切换）。服务未启动时自动拉起。",
   "version": "0.1.0",
   "configSchema": {
     "type": "object",
