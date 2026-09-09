@@ -70,7 +70,7 @@ function setDefaultVoice(voiceId: string): void {
   }
 }
 
-// ── 音量配置 ─────────────────────────────────────────────────
+// ── 音量配置 ────────────────────────────────────────────────
 
 function getVolumeSettings() {
   try {
