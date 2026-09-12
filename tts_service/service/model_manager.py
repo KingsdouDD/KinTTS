@@ -77,15 +77,21 @@ class ModelManager:
         with self._lock:
             if self._idle_exiting:
                 return
-            if not self.is_loaded:
-                return
             if self._last_used_at is None:
                 return
             elapsed = time.time() - self._last_used_at
             if elapsed >= self.idle_timeout:
-                self._unload_model()
-                logger = __import__('logging').getLogger('qwe3-tts')
-                logger.info(f"Idle timeout reached, model unloaded, process stays alive")
+                if self.is_loaded:
+                    self._unload_model()
+                    logger = __import__('logging').getLogger('qwe3-tts')
+                    logger.info(f"Idle timeout reached, model unloaded, exiting process")
+                else:
+                    logger = __import__('logging').getLogger('qwe3-tts')
+                    logger.info(f"Idle timeout reached, exiting process")
+                # 卸载模型后退出进程，下次请求会自动拉起
+                import os, signal
+                self._idle_exiting = True
+                os.kill(os.getpid(), signal.SIGTERM)
 
     def unload_after_synthesis(self):
         """Call this after each synthesis completes.
@@ -106,6 +112,12 @@ class ModelManager:
             self._model_loaded = False
         else:
             self._model_loaded = False
+        # mlx 后端需要 clear_cache 才能释放 Metal 显存
+        try:
+            import mlx.core as mx
+            mx.metal.clear_cache()
+        except Exception:
+            pass
         gc.collect()
 
     @property
