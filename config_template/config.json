@@ -5,7 +5,7 @@
     "startup_timeout": 30
   },
   "model": {
-    "id": "models/Qwen3-TTS-12Hz-1.7B-Base",
+    "id": "models/Qwen3-TTS-12Hz-1.7B-Base/snapshots/37e955a1deb861c088ae5f3a67043185f3d1a60c",
     "lazy_load": true,
     "idle_timeout": 180,
     "unload_after_request": false
@@ -17,7 +17,7 @@
     "lang_code": "zh"
   },
   "voices": {
-    "default": "default"
+    "default": "迪丽热巴_v2"
   },
   "volume": {
     "gain": 1.5,

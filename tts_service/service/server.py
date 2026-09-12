@@ -112,8 +112,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             lifecycle.update_last_used()
-            result = engine.synthesize(text, voice, language)
-            self.send_json(result, 200 if result["success"] else 500)
+            try:
+                result = engine.synthesize(text, voice, language)
+                self.send_json(result, 200 if result.get("success") else 500)
+            except Exception as e:
+                import traceback
+                logger.error(f"/tts exception: {e}")
+                logger.error(traceback.format_exc())
+                self.send_json({"success": False, "error": str(e)}, 500)
 
         elif path == "/voices/register":
             voice_id = data.get("voice_id")
